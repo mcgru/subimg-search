@@ -53,7 +53,7 @@ fn main() -> CliResult {
     do_search(&img, &sub, &args)?;
 
     use std::env;
-    eprintln!("OK: {:?} finished successfully", env::args());
+    info!("OK: {:?} finished successfully", env::args());
 
     Ok(())
 }
