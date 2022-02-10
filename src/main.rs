@@ -22,7 +22,7 @@ struct Cli {
     verbosity: Verbosity,
 
     /// How many pixels from border to skip?
-    #[structopt(short = "s", default_value = "0")]
+    #[structopt(short = "b", default_value = "0")]
     skip_border: u32,
 
     /// Output fodler to put result in
