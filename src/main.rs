@@ -246,7 +246,7 @@ fn do_search(img: &image::DynamicImage, sub: &image::DynamicImage, args: &Cli) -
 
     if thrqty >= 2 {
 
-        // multi-thread case
+        info!("multi-thread case with {} threads",thrqty);
 
         let results : Vec<(u32, image::RgbImage)> =
         (0..thrqty).into_par_iter().map( move |t| {
@@ -272,8 +272,10 @@ fn do_search(img: &image::DynamicImage, sub: &image::DynamicImage, args: &Cli) -
           (ty, res)
         }).collect();
 
+        info!("multi-thread case: done with threads, going to glue results");
+
         for (y_img, b_img) in results {
-//            imageops::overlay(&mut res, &b_img, args.skip_border as i64, y_img as i64);
+           // imageops::overlay(&mut res, &b_img, args.skip_border as i64, y_img as i64);
             for yi in 0 .. b_img.height() {
                 for xi in 0 .. b_img.width() {
                     let pover = b_img.get_pixel(xi, yi);
@@ -287,7 +289,7 @@ fn do_search(img: &image::DynamicImage, sub: &image::DynamicImage, args: &Cli) -
 
     } else {
 
-        // single-thread case
+        info!("single-thread case");
 
         for y in     args.skip_border .. ih-sh { // each row
             for x in args.skip_border .. iw-sw-2*args.skip_border { // each pixel
