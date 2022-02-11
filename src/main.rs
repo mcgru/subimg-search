@@ -3,11 +3,11 @@ use structopt::StructOpt;
 use std::path::{Path, PathBuf};
 use std::ffi::OsStr;
 
-use image::{GenericImageView, ImageBuffer, RgbImage, imageops};
+use image::{GenericImageView, RgbImage, imageops};
 
 
 ///
-/// Program subimg-search searches a subimage in the image and prints the most-probability (RSME) b/w-map
+/// Standard quicli interface to command line args
 ///
 #[derive(StructOpt, Debug)]
 #[structopt(name = "subimg-search")]
@@ -35,19 +35,21 @@ struct Cli {
 
 }
 
+///
+/// Program subimg-search searches a subimage in the image and prints the most-probability (RSME) b/w-map
+///
 fn main() -> CliResult {
     let args = Cli::from_args();
     args.verbosity.setup_env_logger(&env!("CARGO_PKG_NAME"))?;
 
-    // dbg!(args);
     info!("Reading {:?}...", args.subimage);
     let sub = read_image(&args.subimage)?;
 
     info!("Reading {:?}...", args.image);
     let img = read_image(&args.image)?;
 
-    //   info!("Checking {:?} for appropriate properties...", args.target);
-    // check_image(&img)?;
+    assert!( img.width()  > sub.width() +args.skip_border*2 );
+    assert!( img.height() > sub.height()+args.skip_border*2 );
 
     info!("Starts search subimage in image...");
     do_search(&img, &sub, &args)?;
@@ -58,49 +60,56 @@ fn main() -> CliResult {
     Ok(())
 }
 
-// fn read_image(thefilename: &String) -> Result<image::DynamicImage,Error> {
 fn read_image(thefilename: &String) -> image::ImageResult<image::DynamicImage> {
     let img = image::open(std::path::PathBuf::from(thefilename).as_path())?;
     Ok(img)
 }
 
 
+/// Internal empty struct for implementation only
 #[derive(Debug, Clone)]
 pub struct Papath;
 
+/// Some functions to operate with pathnames (as in bash)
 impl Papath {
+    /// like bash::readlink
     pub fn readlink(path: &str) -> String {
         let path = Path::new(path).canonicalize().unwrap_or(PathBuf::new());
         path.to_str().unwrap_or("").to_string()
     }
+    /// like bash::dirname
     pub fn dirname(path: &str) -> String {
         let path = Path::new(path).parent().unwrap_or(Path::new(""));
         path.to_str().unwrap_or("").to_string()
     }
+    /// like bash::basename
     pub fn basename(path: &str) -> String {
         let path = Path::new(path).file_name().unwrap_or(OsStr::new(""));
         path.to_str().unwrap_or("").to_string()
     }
+    /// no alias in bash: returns extension of the path
     pub fn extension(path: &str) -> String {
         let bn = Papath::basename(path);
         let bn : Vec<_> = bn.split(".").collect();
         // dbg!(bn.len());
         match bn.len() {   0..=1 => String::new(),  _ => bn.last().unwrap().to_string()   }
     }
+    /// no alias in bash: returns basename without extension
     pub fn basenoext(path: &str) -> String {
         let bn = Papath::basename(path);
         let mut bn : Vec<_> = bn.split(".").collect();
         // dbg!(bn.len());
-        match bn.len() {   0 => String::new(), 1 => { bn[0].to_string().clone() },  _ => { bn.pop(); bn.last().unwrap().to_string().clone() } }
+        match bn.len() {   0 => String::new(), 1 => { bn[0].to_string() },  _ => { bn.pop(); bn.last().unwrap().to_string() } }
     }
+    /// no alias in bash: returns basename without extension (calls basenoext)
     pub fn file_stem(path: &str) -> String {
         Papath::basenoext(path)
     }
 }
 
 
+/// Calculate new name for result file from input name and output folder if any
 fn calc_new_name( args: &Cli) -> Result<String,Error> {
-    // calculate new name for result file
     let fname = 
     if args.output.is_empty() {
         // need to create if empty
@@ -201,76 +210,96 @@ pub fn calc_root_error_squares_mean_full( sub : &image::RgbImage, sam: image::Su
 //     255 - (calc_root_error_squares_mean_full(sub, sam) as u8)
 // }
 
+use switch_statement::switch;        
+
 
 fn do_search(img: &image::DynamicImage, sub: &image::DynamicImage, args: &Cli) -> Result<(), Error> {
-
-    let thrqty = num_cpus::get() as u32 + 1;
-    // let _ssd_pool = rayon::ThreadPoolBuilder::new().num_threads(thrqty).build().unwrap();
-
-    if img.height() < 3 {
-        bail!(format!("Image height is too small: {}",img.height()));
-    }
-    if img.height() < 2 {
-        bail!(format!("Subimage height is too small: {}",sub.height()));
-    }
-    if img.height() < (sub.height()+1) {
-        bail!(format!("Image height is lesser than subimage height+1: {} vs {}",img.height(), sub.height() ));
-    }
 
     let fname = calc_new_name(&args).unwrap();
 
     let img = img.as_rgb8().unwrap();
     let sub = sub.as_rgb8().unwrap();
 
-  let iw = img.width();
-  let ih = img.height();
-  let sw = sub.width();
-  let sh = sub.height();
+    let iw = img.width()  - args.skip_border*2;
+    let ih = img.height() - args.skip_border*2;
+    let sw = sub.width();
+    let sh = sub.height();
+
+// thrqty: number of threads = number of strips
+// subqty: how much full subimage's heights fit in image height
+// pih: part of image height = image height divided by thrqty :: approximately
+// piw: part of image width  = same as full image width
+// ty: thread's strip's starting y-coord
+// th: thread's strip's height
+// 
+    let subqty = ih/sh ; // ih>=sh
+    let mut thrqty = num_cpus::get() as u32 ;
+    if subqty < thrqty { thrqty=subqty };
+    if subqty < 4      { thrqty=1 };
 
     let ( piw, pih ) = ( iw, ih / thrqty );
 
     // use std::time::{Duration, Instant};
     // let start = Instant::now();
 
-use switch_statement::switch;        
+    let mut res = image::RgbImage::new( iw, ih );
 
-    let results : Vec<(u32, image::RgbImage)> = 
-    (0..thrqty).into_par_iter().map( move |t| {
+    if thrqty >= 2 {
 
-      let py = switch! { t;
-        0 => 0,
-        thrqty-1 => t*pih-(sh+1),
-        _ =>  t*pih,
-      };
-      let ph = switch! { t;
-        thrqty-1 => ih-(t*pih-(sh+1)),
-        _ =>  pih+sh+1,
-      };
+        // multi-thread case
 
-    //  dbg!((t_1,t,pih,ih,py,ph));
+        let results : Vec<(u32, image::RgbImage)> =
+        (0..thrqty).into_par_iter().map( move |t| {
 
-      let imgpart = img.view( 0, py, piw, ph );
+          let ty = t * pih + args.skip_border;
 
-      let mut res = image::RgbImage::new( piw, ph );
+          let th = switch! { t;
+            thrqty-1 => ih-ty,
+            _ =>  pih+sh,
+          };
 
-      for y in  0 .. ph-sh { // each row
-         for x in 0 .. piw-sw { // each pixel
-           let sam = imgpart.view( x, y, sw, sh);
-           let pxerr = 255 - (calc_root_error_squares_mean_full(sub, sam) as u8);
-           res.put_pixel( x+sw/2, y+sh/2, image::Rgb([pxerr,pxerr,pxerr]) );
-         };
-      };
-      (py, res)
-    }).collect();
+          let imgpart = img.view( args.skip_border, ty, piw-2*args.skip_border, th );
+
+          let mut res = image::RgbImage::new( piw-2*args.skip_border, th );
+
+          for y in    0 .. th-sh  { // each row
+             for x in 0 .. piw-sw-2*args.skip_border { // each pixel
+               let sam = imgpart.view( x, y, sw, sh);
+               let pxerr = 255 - (calc_root_error_squares_mean_full(sub, sam) as u8);
+               res.put_pixel( x+sw/2, y+sh/2, image::Rgb([pxerr,pxerr,pxerr]) );
+             };
+          };
+          (ty, res)
+        }).collect();
+
+        for (y_img, b_img) in results {
+//            imageops::overlay(&mut res, &b_img, args.skip_border as i64, y_img as i64);
+            for yi in 0 .. b_img.height() {
+                for xi in 0 .. b_img.width() {
+                    let pover = b_img.get_pixel(xi, yi);
+                    let pbase =   res.get_pixel(xi+args.skip_border, y_img+yi+args.skip_border);
+                    let psumm = (pbase[0] as u32) + (pover[0] as u32);
+                    let psumm = if psumm <= 255 { psumm } else { 255 } as u8;
+                    res.put_pixel( xi+args.skip_border, y_img+yi+args.skip_border, image::Rgb([psumm,psumm,psumm]) );
+                }
+            }
+        }
+
+    } else {
+
+        // single-thread case
+
+        for y in     args.skip_border .. ih-sh { // each row
+            for x in args.skip_border .. iw-sw-2*args.skip_border { // each pixel
+               let sam = img.view( x, y, sw, sh);
+               let pxerr = 255 - (calc_root_error_squares_mean_full(sub, sam) as u8);
+               res.put_pixel( x+sw/2, y+sh/2, image::Rgb([pxerr,pxerr,pxerr]) );
+            };
+        };
+    }
 
 // let duration = start.elapsed();
 // eprintln!("Time elapsed in expensive_function() is: {:?}", duration);
-
-  let mut res = image::RgbImage::new( iw, ih );
-
-  for (y, i) in results {
-    imageops::overlay(&mut res, &i, 0, y as i64);
-  }
 
 
     res.save(fname).unwrap();
