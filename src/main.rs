@@ -264,7 +264,7 @@ fn do_search(img: &image::DynamicImage, sub: &image::DynamicImage, args: &Cli) -
              for x in 0 .. piw-sw { // each pixel
                let sam = img_view.view( x, y, sw, sh);
                let pxerr = 255 - (calc_root_error_squares_mean_full(sub, sam) as u8);
-               img_mt_accum.put_pixel( x, y, image::Rgb([pxerr,pxerr,pxerr]) );
+               img_mt_accum.put_pixel( x+sw/2, y+sh/2, image::Rgb([pxerr,pxerr,pxerr]) );
              };
           };
           (ty, img_mt_accum)
@@ -293,7 +293,7 @@ fn do_search(img: &image::DynamicImage, sub: &image::DynamicImage, args: &Cli) -
             for x in args.skip_border .. iw-sw-2*args.skip_border { // each pixel
                let sam = img.view( x, y, sw, sh);
                let pxerr = 255 - (calc_root_error_squares_mean_full(sub, sam) as u8);
-               img_final.put_pixel( x, y, image::Rgb([pxerr,pxerr,pxerr]) );
+               img_final.put_pixel( x+sw/2, y+sh/2, image::Rgb([pxerr,pxerr,pxerr]) );
             };
         };
     }
