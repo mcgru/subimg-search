@@ -173,7 +173,7 @@ pub fn calc_root_error_squares_mean_full( sub : &image::RgbImage, sam: image::Su
 //    let width  = if i1w<=i2w { i1w } else { i2w } ;
 //    let height = if i1h<=i2h { i1h } else { i2h } ;
 //    let minsize= if width<=height { width } else { height } ;
-    let qty = i1w*i1h;
+    let qty = i1w; // i1w*i1h for nice picture as in ImageMagick::compare -subimage-search -metric RMSE
     let mut acc = 0_f32;
     for y in 0 .. i1h {
     for x in 0 .. i1w {
