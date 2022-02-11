@@ -3,7 +3,8 @@ use structopt::StructOpt;
 use std::path::{Path, PathBuf};
 use std::ffi::OsStr;
 
-use image::{GenericImageView, RgbImage, imageops};
+// use image::{GenericImageView, RgbImage, imageops};
+use image::{GenericImageView, RgbImage};
 
 
 ///
