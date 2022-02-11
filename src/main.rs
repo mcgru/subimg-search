@@ -232,17 +232,17 @@ fn do_search(img: &image::DynamicImage, sub: &image::DynamicImage, args: &Cli) -
 // ty: thread's strip's starting y-coord
 // th: thread's strip's height
 // 
-    let subqty = ih/sh ; // ih>=sh
+    let subqty = (ih-2*args.skip_border)/sh ; // ih>=sh
     let mut thrqty = num_cpus::get() as u32 ;
     if subqty < thrqty { thrqty=subqty };
     if subqty < 4      { thrqty=1 };
 
-    let ( piw, pih ) = ( iw, ih / thrqty );
+    let ( piw, pih ) = ( iw-2*args.skip_border, (ih-2*args.skip_border) / thrqty );
 
     // use std::time::{Duration, Instant};
     // let start = Instant::now();
 
-    let mut res = image::RgbImage::new( iw, ih );
+    let mut img_final = image::RgbImage::new( iw, ih );
 
     if thrqty >= 2 {
 
@@ -254,35 +254,35 @@ fn do_search(img: &image::DynamicImage, sub: &image::DynamicImage, args: &Cli) -
           let ty = t * pih + args.skip_border;
 
           let th = switch! { t;
-            thrqty-1 => ih-ty,
+            thrqty-1 => (ih-args.skip_border)-ty,
             _ =>  pih+sh,
           };
 
-          let imgpart = img.view( args.skip_border, ty, piw-2*args.skip_border, th );
+          let img_view = img.view( args.skip_border, ty, piw, th );
 
-          let mut res = image::RgbImage::new( piw-2*args.skip_border, th );
+          let mut img_mt_accum = image::RgbImage::new( piw, th );
 
           for y in    0 .. th-sh  { // each row
-             for x in 0 .. piw-sw-2*args.skip_border { // each pixel
-               let sam = imgpart.view( x, y, sw, sh);
+             for x in 0 .. piw-sw { // each pixel
+               let sam = img_view.view( x, y, sw, sh);
                let pxerr = 255 - (calc_root_error_squares_mean_full(sub, sam) as u8);
-               res.put_pixel( x+sw/2, y+sh/2, image::Rgb([pxerr,pxerr,pxerr]) );
+               img_mt_accum.put_pixel( x+sw/2, y+sh/2, image::Rgb([pxerr,pxerr,pxerr]) );
              };
           };
-          (ty, res)
+          (ty, img_mt_accum)
         }).collect();
 
         info!("multi-thread case: done with threads, going to glue results");
 
-        for (y_img, b_img) in results {
-           // imageops::overlay(&mut res, &b_img, args.skip_border as i64, y_img as i64);
-            for yi in 0 .. b_img.height() {
-                for xi in 0 .. b_img.width() {
-                    let pover = b_img.get_pixel(xi, yi);
-                    let pbase =   res.get_pixel(xi+args.skip_border, y_img+yi+args.skip_border);
+        for (y, r) in results {
+           // imageops::overlay(&mut img_final, &r, args.skip_border as i64, y as i64);
+            for yi in 0 .. r.height() {
+                for xi in 0 .. r.width() {
+                    let pover = r.get_pixel(xi, yi);
+                    let pbase =   img_final.get_pixel(xi+args.skip_border, y + yi );  // y already has +args.skip_border
                     let psumm = (pbase[0] as u32) + (pover[0] as u32);
                     let psumm = if psumm <= 255 { psumm } else { 255 } as u8;
-                    res.put_pixel( xi+args.skip_border, y_img+yi+args.skip_border, image::Rgb([psumm,psumm,psumm]) );
+                    img_final.put_pixel( xi+args.skip_border, y + yi, image::Rgb([psumm,psumm,psumm]) );   // y already has +args.skip_border
                 }
             }
         }
@@ -295,7 +295,7 @@ fn do_search(img: &image::DynamicImage, sub: &image::DynamicImage, args: &Cli) -
             for x in args.skip_border .. iw-sw-2*args.skip_border { // each pixel
                let sam = img.view( x, y, sw, sh);
                let pxerr = 255 - (calc_root_error_squares_mean_full(sub, sam) as u8);
-               res.put_pixel( x+sw/2, y+sh/2, image::Rgb([pxerr,pxerr,pxerr]) );
+               img_final.put_pixel( x+sw/2, y+sh/2, image::Rgb([pxerr,pxerr,pxerr]) );
             };
         };
     }
@@ -304,7 +304,7 @@ fn do_search(img: &image::DynamicImage, sub: &image::DynamicImage, args: &Cli) -
 // eprintln!("Time elapsed in expensive_function() is: {:?}", duration);
 
 
-    res.save(fname).unwrap();
+    img_final.save(fname).unwrap();
 
 Ok(())
 }
