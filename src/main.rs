@@ -169,16 +169,14 @@ pub fn calc_root_error_squares_mean_full( sub : &image::RgbImage, sam: image::Su
     // let sub = sub.as_rgb8().unwrap();
     // let sam = sam.as_rgb8().unwrap();
     let (i1w, i1h) = sub.dimensions();
-    let (i2w, i2h) = sub.dimensions();
-    let width  = if i1w<=i2w { i1w } else { i2w } ;
-    let height = if i1h<=i2h { i1h } else { i2h } ;
-    let minsize= if width<=height { width } else { height } ;
-    let qty = minsize;
+//    let (i2w, i2h) = sub.dimensions();
+//    let width  = if i1w<=i2w { i1w } else { i2w } ;
+//    let height = if i1h<=i2h { i1h } else { i2h } ;
+//    let minsize= if width<=height { width } else { height } ;
+    let qty = i1w*i1h;
     let mut acc = 0_f32;
-    // let mut add = 0f64;
-    // let mut dbgstr : String;
-    for y in 0 .. minsize {
-    for x in 0 .. minsize {
+    for y in 0 .. i1h {
+    for x in 0 .. i1w {
         let i1p = sub[(x,y)];
         // let i2p = sam.inner().get_pixel(i,i);
         let i2p = sam.get_pixel(x,y);
@@ -210,8 +208,7 @@ pub fn calc_root_error_squares_mean_full( sub : &image::RgbImage, sam: image::Su
 //     255 - (calc_root_error_squares_mean_full(sub, sam) as u8)
 // }
 
-use switch_statement::switch;        
-
+use switch_statement::switch;
 
 fn do_search(img: &image::DynamicImage, sub: &image::DynamicImage, args: &Cli) -> Result<(), Error> {
 
