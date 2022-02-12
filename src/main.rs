@@ -179,6 +179,10 @@ pub fn calc_root_error_squares_mean_full( sub : &image::RgbImage, sam: image::Su
     for y in 0 .. i1h {
     for x in 0 .. i1w {
         let i1p = sub[(x,y)];
+        if i1p[0] == 0 && i1p[1] == 0 && i1p[2] == 0 {
+            // skip black pixel in subimage
+            continue;
+        }
         // let i2p = sam.inner().get_pixel(i,i);
         let i2p = sam.get_pixel(x,y);
         let i1p = [ i1p[0] as i32, i1p[1] as i32, i1p[2] as i32 ];
