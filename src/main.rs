@@ -1,7 +1,5 @@
 use quicli::prelude::*;
 use structopt::StructOpt;
-use std::path::{Path, PathBuf};
-use std::ffi::OsStr;
 
 // use image::{GenericImageView, RgbImage, imageops};
 use image::{GenericImageView, RgbImage};
@@ -67,47 +65,7 @@ fn read_image(thefilename: &String) -> image::ImageResult<image::DynamicImage> {
 }
 
 
-/// Internal empty struct for implementation only
-#[derive(Debug, Clone)]
-pub struct Papath;
-
-/// Some functions to operate with pathnames (as in bash)
-impl Papath {
-    /// like bash::readlink
-    pub fn readlink(path: &str) -> String {
-        let path = Path::new(path).canonicalize().unwrap_or(PathBuf::new());
-        path.to_str().unwrap_or("").to_string()
-    }
-    /// like bash::dirname
-    pub fn dirname(path: &str) -> String {
-        let path = Path::new(path).parent().unwrap_or(Path::new(""));
-        path.to_str().unwrap_or("").to_string()
-    }
-    /// like bash::basename
-    pub fn basename(path: &str) -> String {
-        let path = Path::new(path).file_name().unwrap_or(OsStr::new(""));
-        path.to_str().unwrap_or("").to_string()
-    }
-    /// no alias in bash: returns extension of the path
-    pub fn extension(path: &str) -> String {
-        let bn = Papath::basename(path);
-        let bn : Vec<_> = bn.split(".").collect();
-        // dbg!(bn.len());
-        match bn.len() {   0..=1 => String::new(),  _ => bn.last().unwrap().to_string()   }
-    }
-    /// no alias in bash: returns basename without extension
-    pub fn basenoext(path: &str) -> String {
-        let bn = Papath::basename(path);
-        let mut bn : Vec<_> = bn.split(".").collect();
-        // dbg!(bn.len());
-        match bn.len() {   0 => String::new(), 1 => { bn[0].to_string() },  _ => { bn.pop(); bn.last().unwrap().to_string() } }
-    }
-    /// no alias in bash: returns basename without extension (calls basenoext)
-    pub fn file_stem(path: &str) -> String {
-        Papath::basenoext(path)
-    }
-}
-
+use bash_like_utils::PathString;
 
 /// Calculate new name for result file from input name and output folder if any
 fn calc_new_name( args: &Cli) -> Result<String,Error> {
@@ -117,11 +75,11 @@ fn calc_new_name( args: &Cli) -> Result<String,Error> {
         let outdir =
         if args.output_folder.is_empty() {
             // use folder of input file
-            Papath::dirname(Papath::readlink(&args.image).as_str())
+            PathString::dirname(PathString::readlink(&args.image).as_str())
         }else {
             format!("{}",args.output_folder)
         };
-        let bname = format!("{}.MAP.{}.{}", Papath::basenoext(&args.image), Papath::basenoext(&args.subimage), Papath::extension(&args.image) );
+        let bname = format!("{}.MAP.{}.{}", PathString::basenoext(&args.image), PathString::basenoext(&args.subimage), PathString::extension(&args.image) );
         format!("{}/{}", outdir, bname )
     } else {
         // just use it

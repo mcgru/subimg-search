@@ -14,3 +14,4 @@ regex = "~1"
 rayon = "1.5"
 num_cpus = "*"
 switch_statement = "*"
+bash-like-utils = {git="https://github.com/mcgru/bash-like-utils"}

@@ -74,6 +74,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "bash-like-utils"
+version = "0.1.0"
+source = "git+https://github.com/mcgru/bash-like-utils#13db3683007ff0ae77f20d4ff13bb443dafdabbb"
+
+[[package]]
 name = "bit_field"
 version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -928,6 +933,7 @@ dependencies = [
 name = "subimg-search"
 version = "0.3.0"
 dependencies = [
+ "bash-like-utils",
  "image",
  "num_cpus",
  "quicli",
